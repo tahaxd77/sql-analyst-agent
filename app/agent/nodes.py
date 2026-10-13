@@ -1,21 +1,47 @@
+# app/agent/nodes.py
 from typing import Any, Dict
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 
 from app.config import settings
-from app.agent.state import AgentState, SQLOutput
-from app.agent.prompts import SQL_GENERATION_PROMPT, SQL_CORRECTION_PROMPT, SYNTHESIS_PROMPT
+from app.agent.state import AgentState, SQLOutput, IntentClassification
+from app.agent.prompts import (
+    INTENT_CLASSIFICATION_PROMPT,
+    SQL_GENERATION_PROMPT,
+    SQL_CORRECTION_PROMPT,
+    SYNTHESIS_PROMPT
+)
 from app.database.connection import execute_raw_sql
 from app.database.guardrails import validate_sql, SQLSecurityException
 
-# Initialize provider dynamically based on settings
 if settings.llm_provider == "gemini":
     base_llm = ChatGoogleGenerativeAI(model=settings.llm_model, temperature=0)
 else:
     base_llm = ChatOpenAI(model=settings.llm_model, temperature=0)
 
+structured_classifier = base_llm.with_structured_output(IntentClassification)
 structured_sql_llm = base_llm.with_structured_output(SQLOutput)
+
+def classify_intent(state: AgentState) -> Dict[str, Any]:
+    """Classifies whether the query is relevant to the business database."""
+    prompt = INTENT_CLASSIFICATION_PROMPT.format(
+        schema=state["schema"],
+        question=state["question"]
+    )
+    result: IntentClassification = structured_classifier.invoke([HumanMessage(content=prompt)])
+    return {"is_relevant": result.is_relevant}
+
+def handle_irrelevant_query(state: AgentState) -> Dict[str, Any]:
+    """Returns a direct out-of-scope response without executing SQL."""
+    return {
+        "sql_query": None,
+        "query_result": None,
+        "final_answer": (
+            "I can only assist with queries related to our business database "
+            "(customers, products, sales, and orders). Please enter a relevant data question."
+        )
+    }
 
 def generate_sql(state: AgentState) -> Dict[str, Any]:
     prompt = SQL_GENERATION_PROMPT.format(schema=state["schema"], question=state["question"])

@@ -24,6 +24,7 @@ if st.button("Run Analysis", type="primary") and question:
         result = agent_executor.invoke({
             "question": question,
             "schema": get_db_schema(),
+            "is_relevant": None,
             "sql_query": None,
             "query_result": None,
             "error_message": None,
