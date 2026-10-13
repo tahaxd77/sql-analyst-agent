@@ -1,0 +1,12 @@
+[
+  {
+    "question": "Which customer spent the most money overall?",
+    "ground_truth_keywords": ["Charlie Brown", "240"],
+    "requires_join": true
+  },
+  {
+    "question": "Show total sales volume for Electronics category.",
+    "ground_truth_keywords": ["180"],
+    "requires_join": true
+  }
+]
